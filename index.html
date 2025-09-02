@@ -384,21 +384,7 @@ if (!state.achievements) {
   state.achievements = defaultAchievements();
 }
 
-// Check achievements each frame
-function checkAchievements() {
-  for (const a of ACHIEVEMENTS) {
-    if (!state.achievements[a.id] && a.check()) {
-      unlockAchievement(a);
-    }
-  }
-}
-
-function unlockAchievement(a) {
-  state.achievements[a.id] = true;
-  save();
-  flash(`🏆 Achievement Unlocked: ${a.name}`, "good");
-}
-    const achievementsEl = document.getElementById("achievementsList");
+const achievementsEl = document.getElementById("achievementsList");
 
 function renderAchievements() {
   achievementsEl.innerHTML = "";
@@ -415,6 +401,32 @@ function renderAchievements() {
     achievementsEl.appendChild(div);
   });
 }
+
+// Update panel when an achievement is unlocked
+function unlockAchievement(a) {
+  state.achievements[a.id] = true;
+  save();
+  flash(`🏆 Achievement Unlocked: ${a.name}`, "good");
+  renderAchievements();
+}
+// Initial render
+renderAchievements();
+    
+function applyOfflineProgress() {
+  const now = Date.now();
+  const diff = (now - state.lastTick) / 1000; // seconds offline
+  const gained = currentEPS() * diff;
+  if (gained > 0) {
+    state.eggs += gained;
+    flash(`While you were away, your ducks laid ${fmt(gained)} eggs!`, "good");
+    renderStats();
+  }
+  state.lastTick = now; // reset lastTick
+}
+
+// Call this right after loading the state
+applyOfflineProgress();
+
 
 // Hook into your game loop
 const oldTick = tick;
@@ -447,8 +459,3 @@ tick = tickWrapper;
   </script>
 </body>
 </html>
-
-
-
-
-
