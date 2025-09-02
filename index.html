@@ -113,16 +113,23 @@
   </div>
 
   <script>
-    const SPECIES = [
-      {id:'mallard', name:'Mallard', rarity:'Common', weight:50, eps:0.10, emoji:'🟢'},
-      {id:'pekin', name:'Pekin', rarity:'Common', weight:40, eps:0.12, emoji:'🟢'},
-      {id:'runner', name:'Runner', rarity:'Common', weight:35, eps:0.11, emoji:'🟢'},
-      {id:'golden', name:'Golden Duck', rarity:'Rare', weight:10, eps:0.50, emoji:'✨'},
-      {id:'robo', name:'RoboDuck', rarity:'Rare', weight:8, eps:0.60, emoji:'🤖'},
-      {id:'vampire', name:'Vampire Duck', rarity:'Rare', weight:6, eps:0.55, emoji:'🧛'},
-      {id:'cosmic', name:'Cosmic Duck', rarity:'Legendary', weight:1.5, eps:2.00, emoji:'🌌'},
-      {id:'rex', name:'Duckosaurus Rex', rarity:'Legendary', weight:1.0, eps:2.50, emoji:'🦖'},
-    ];
+const SPECIES = [
+  {id:'mallard', name:'Mallard', rarity:'Common', weight:50, eps:0.10, emoji:'🦆'},
+  {id:'pekin', name:'Pekin', rarity:'Common', weight:40, eps:0.12, emoji:'🐤'},
+  {id:'runner', name:'Runner', rarity:'Common', weight:35, eps:0.11, emoji:'🏃‍♂️'},
+  {id:'northernShoveler', name:'Northern Shoveler', rarity:'Common', weight:30, eps:0.09, emoji:'🥄'},
+  {id:'gadwall', name:'Gadwall', rarity:'Common', weight:25, eps:0.08, emoji:'🌿'},
+  {id:'woodDuck', name:'Wood Duck', rarity:'Rare', weight:10, eps:0.50, emoji:'🌳'},
+  {id:'mandarin', name:'Mandarin Duck', rarity:'Rare', weight:8, eps:0.60, emoji:'🦚'},
+  {id:'redhead', name:'Redhead', rarity:'Rare', weight:7, eps:0.55, emoji:'🔴'},
+  {id:'canvasback', name:'Canvasback', rarity:'Rare', weight:6, eps:0.52, emoji:'⚪'},
+  {id:'goldeneye', name:'Goldeneye', rarity:'Rare', weight:5, eps:0.50, emoji:'🟡'},
+  {id:'muscovy', name:'Muscovy Duck', rarity:'Legendary', weight:1.5, eps:2.00, emoji:'🦢'},
+  {id:'harlequin', name:'Harlequin Duck', rarity:'Legendary', weight:1.0, eps:2.50, emoji:'🏔️'},
+  {id:'baikalTeal', name:'Baikal Teal', rarity:'Legendary', weight:0.8, eps:2.20, emoji:'❄️'},
+  {id:'woodHybrid', name:'Wood Duck Hybrid', rarity:'Legendary', weight:0.5, eps:2.80, emoji:'🌟'},
+  {id:'blackDuck', name:'Black Duck', rarity:'Legendary', weight:0.5, eps:2.50, emoji:'🖤'},
+];    
     const COMMON_IDS = SPECIES.filter(s=>s.rarity==='Common').map(s=>s.id);
     const RARE_IDS = SPECIES.filter(s=>s.rarity==='Rare').map(s=>s.id);
     const LEG_IDS = SPECIES.filter(s=>s.rarity==='Legendary').map(s=>s.id);
@@ -440,6 +447,7 @@ tick = tickWrapper;
   </script>
 </body>
 </html>
+
 
 
 
