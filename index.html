@@ -352,6 +352,45 @@
       setTimeout(()=>{ n.style.transition='all .25s'; n.style.opacity='0'; n.style.transform='translateX(-50%) translateY(10px)'; }, 1600);
       setTimeout(()=>{ document.body.removeChild(n); toastQ.shift(); }, 1900);
     }
+const ACHIEVEMENTS = [
+  { id: "firstDuck",   name: "First Duck!", desc: "Hatch your very first duck", check: () => totalDucks() >= 1 },
+  { id: "eggFarmer",   name: "Egg Farmer",  desc: "Lay 1,000 eggs",             check: () => state.eggs >= 1000 },
+  { id: "flockMaster", name: "Flock Master",desc: "Own 50 ducks",               check: () => totalDucks() >= 50 },
+  { id: "prestiger",   name: "The Cycle",   desc: "Perform a prestige",         check: () => state.feathers > 0 },
+  // 👉 Add your own here
+];
+
+function defaultAchievements() {
+  return Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, false]));
+}
+
+// Merge with save data
+if (!state.achievements) {
+  state.achievements = defaultAchievements();
+}
+
+// Check achievements each frame
+function checkAchievements() {
+  for (const a of ACHIEVEMENTS) {
+    if (!state.achievements[a.id] && a.check()) {
+      unlockAchievement(a);
+    }
+  }
+}
+
+function unlockAchievement(a) {
+  state.achievements[a.id] = true;
+  save();
+  flash(`🏆 Achievement Unlocked: ${a.name}`, "good");
+}
+
+// Hook into your game loop
+const oldTick = tick;
+function tickWrapper() {
+  oldTick();
+  checkAchievements();
+}
+tick = tickWrapper;
 
     // Game Loop
     function tick(){
@@ -375,3 +414,4 @@
   </script>
 </body>
 </html>
+
