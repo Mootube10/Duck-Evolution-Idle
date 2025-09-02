@@ -44,6 +44,8 @@
     .r-Rare{background:rgba(127,255,159,.08)}
     .r-Legendary{background:rgba(255,210,124,.08)}
 
+    #wildDuck{display:none;position:fixed;bottom:20px;right:20px;font-size:40px;cursor:pointer;z-index:2000}
+
     footer{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:12px}
     a.link{color:var(--accent);text-decoration:none}
   </style>
@@ -57,6 +59,7 @@
         <div class="chip">🦆 Ducks: <b id="ducks">0</b></div>
         <div class="chip">⚡ EPS: <b id="eps">0</b></div>
         <div class="chip">💠 Feathers: <b id="feathers">0</b></div>
+        <div class="chip">🏡 Habitat: <b id="habitat">Pond</b></div>
       </div>
     </header>
 
@@ -80,6 +83,10 @@
               Buy Feeder — <span id="feederCost">50</span>🥚
               <div class="small">+0.5 passive EPS (scales 25% each)</div>
             </button>
+            <button id="habitatBtn" class="btn">
+              Upgrade Habitat — <span id="habitatCost">200</span>🥚
+              <div class="small">Boost EPS with new environment</div>
+            </button>
             <button id="prestigeBtn" class="btn">
               Prestige (Rebirth)
               <div class="small">Reset for Golden Feathers (boost EPS)</div>
@@ -94,284 +101,161 @@
           <div id="dex" class="dex"></div>
         </div>
       </section>
+
+      <section class="card">
+        <div class="body">
+          <h2>Achievements</h2>
+          <div id="achievements"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="body">
+          <h2>Prestige Perks</h2>
+          <div id="perks"></div>
+        </div>
+      </section>
     </main>
 
     <footer>
       <span>Autosaves locally. 💾</span>
       <button id="saveBtn" class="btn" style="width:auto;padding:6px 10px">Save</button>
       <button id="resetBtn" class="btn" style="width:auto;padding:6px 10px;background:rgba(255,0,0,.12);border-color:rgba(255,0,0,.25)">Hard Reset</button>
-      <span style="margin-left:auto">v0.1 — by You</span>
+      <span style="margin-left:auto">v0.2 — by You</span>
     </footer>
   </div>
 
+  <div id="wildDuck">🦆</div>
+
   <script>
-    const SPECIES = [
-      {id:'mallard', name:'Mallard', rarity:'Common', weight:50, eps:0.10, emoji:'🟢'},
-      {id:'pekin', name:'Pekin', rarity:'Common', weight:40, eps:0.12, emoji:'🟢'},
-      {id:'runner', name:'Runner', rarity:'Common', weight:35, eps:0.11, emoji:'🟢'},
-      {id:'golden', name:'Golden Duck', rarity:'Rare', weight:10, eps:0.50, emoji:'✨'},
-      {id:'robo', name:'RoboDuck', rarity:'Rare', weight:8, eps:0.60, emoji:'🤖'},
-      {id:'vampire', name:'Vampire Duck', rarity:'Rare', weight:6, eps:0.55, emoji:'🧛'},
-      {id:'cosmic', name:'Cosmic Duck', rarity:'Legendary', weight:1.5, eps:2.00, emoji:'🌌'},
-      {id:'rex', name:'Duckosaurus Rex', rarity:'Legendary', weight:1.0, eps:2.50, emoji:'🦖'},
+    // === Game Additions ===
+    const habitats = ['Pond','Lake','Fountain','Space Station'];
+    const achievementsList = [
+      {id:1, text:'First Duck Hatched', condition:(s)=>s.totalHatched>=1},
+      {id:2, text:'100 Eggs Collected', condition:(s)=>s.eggs>=100},
+      {id:3, text:'Prestige Once', condition:(s)=>s.feathers>=1},
     ];
-    const COMMON_IDS = SPECIES.filter(s=>s.rarity==='Common').map(s=>s.id);
-    const RARE_IDS = SPECIES.filter(s=>s.rarity==='Rare').map(s=>s.id);
-    const LEG_IDS = SPECIES.filter(s=>s.rarity==='Legendary').map(s=>s.id);
+    const perksList = [
+      {id:'cheapHatch', name:'Cheaper Hatching', cost:1, effect:(s)=>s.hatchDiscount=true},
+      {id:'fastClick', name:'Faster Clicking', cost:2, effect:(s)=>s.clickPower=2},
+      {id:'rareBoost', name:'Rare Chance Boost', cost:3, effect:(s)=>s.rareBoost=true},
+    ];
 
-    const el = id => document.getElementById(id);
+    // Extend default state
+    const oldDefault = defaultState;
+    defaultState = ()=>(Object.assign(oldDefault(), {
+      achievements:[],
+      habitat:0,
+      perks:[],
+      clickPower:1,
+      hatchDiscount:false,
+      rareBoost:false
+    }));
 
-    const fmt = (n)=>{
-      if(n>=1e9) return (n/1e9).toFixed(2)+'B';
-      if(n>=1e6) return (n/1e6).toFixed(2)+'M';
-      if(n>=1e3) return (n/1e3).toFixed(2)+'K';
-      return (Math.round(n*100)/100).toString();
+    // Extend save/load
+    const oldLoad = load;
+    load = ()=> {
+      let s = oldLoad();
+      return Object.assign(defaultState(), s);
     };
 
-    const defaultState = ()=>({
-      eggs:0,
-      feeders:0,
-      feathers:0,
-      totalHatched:0,
-      speciesCounts:Object.fromEntries(SPECIES.map(s=>[s.id,0])),
-      lastTick:Date.now(),
-    });
-
-    let state = load();
-
-    function load(){
-      try{
-        const raw = localStorage.getItem('duckidle.save');
-        if(!raw) return defaultState();
-        const s = JSON.parse(raw);
-        // migrate
-        const base = defaultState();
-        return Object.assign(base, s, {
-          speciesCounts: Object.assign(base.speciesCounts, s.speciesCounts||{})
-        });
-      }catch(e){
-        console.warn('Save load failed', e);
-        return defaultState();
-      }
-    }
-    function save(){
-      localStorage.setItem('duckidle.save', JSON.stringify(state));
+    // Upgrade Habitat
+    function habitatCost(){return Math.floor(200*Math.pow(2,state.habitat));}
+    function upgradeHabitat(){
+      const cost = habitatCost();
+      if(state.eggs<cost) return flash('Not enough eggs','warn');
+      if(state.habitat>=habitats.length-1) return flash('Max habitat reached','warn');
+      state.eggs-=cost;
+      state.habitat++;
+      flash('Habitat upgraded ➜ '+habitats[state.habitat]);
+      renderStats();
     }
 
-    function totalDucks(){
-      return Object.values(state.speciesCounts).reduce((a,b)=>a+b,0);
-    }
-
-    function currentEPS(){
-      const feathersBoost = 1 + state.feathers*0.1; // +10% per feather
-      const ducksEPS = SPECIES.reduce((sum,s)=> sum + state.speciesCounts[s.id]*s.eps, 0);
-      const feedersEPS = state.feeders * 0.5;
-      return (ducksEPS + feedersEPS) * feathersBoost;
-    }
-
-    function weightedPick(ids){
-      const pool = SPECIES.filter(s=>ids.includes(s.id));
-      const sum = pool.reduce((a,s)=>a+s.weight,0);
-      let r = Math.random()*sum;
-      for(const s of pool){
-        if((r-=s.weight)<=0) return s.id;
-      }
-      return pool[pool.length-1].id;
-    }
-
-    function hatchDuck(){
-      const cost = hatchCost();
-      if(state.eggs < cost) return false;
-      state.eggs -= cost;
-      // Hatch: mostly commons, rare chance baked into weights
-      const id = weightedPick(SPECIES.map(s=>s.id));
-      state.speciesCounts[id]++;
-      state.totalHatched++;
-      return id;
-    }
-
-    function hatchCost(){
-      const base = 10;
-      // mild scaling with total ducks to keep pacing
-      return Math.floor(base + Math.max(0, totalDucks()-10)*0.5);
-    }
-
-    function evolveDuck(){
-      const cost = evolveCost();
-      if(state.eggs < cost) return {ok:false, reason:'Need more eggs'};
-      // must have at least 1 common
-      const commonCount = COMMON_IDS.reduce((a,id)=>a+state.speciesCounts[id],0);
-      if(commonCount<=0) return {ok:false, reason:'No common ducks to evolve'};
-      state.eggs -= cost;
-      // 65% chance -> Rare, 12% -> Legendary, else failed mutation into different Common
-      const roll = Math.random();
-      if(roll < 0.12){
-        const target = weightedPick(LEG_IDS);
-        // consume one common
-        consumeOne(COMMON_IDS);
-        state.speciesCounts[target]++;
-        return {ok:true, tier:'Legendary', id:target};
-      }else if(roll < 0.77){
-        const target = weightedPick(RARE_IDS);
-        consumeOne(COMMON_IDS);
-        state.speciesCounts[target]++;
-        return {ok:true, tier:'Rare', id:target};
-      }else{
-        const target = weightedPick(COMMON_IDS);
-        consumeOne(COMMON_IDS);
-        state.speciesCounts[target]++;
-        return {ok:true, tier:'Common', id:target, downgraded:true};
-      }
-    }
-
-    function consumeOne(idList){
-      // remove one duck from the first available id in list
-      for(const id of idList){
-        if(state.speciesCounts[id]>0){ state.speciesCounts[id]--; return; }
-      }
-    }
-
-    function evolveCost(){
-      return Math.floor(100 + totalDucks()*2);
-    }
-
-    function feederCost(){
-      return Math.floor(50 * Math.pow(1.25, state.feeders));
-    }
-
-    function prestigeAvailable(){
-      return totalDucks() >= 100;
-    }
-
-    function doPrestige(){
-      if(!prestigeAvailable()) return false;
-      const feathersGain = Math.floor(totalDucks()/100);
-      if(!confirm(`Prestige for ${feathersGain} Golden Feather(s)? This resets eggs, ducks and feeders.`)) return false;
-      state = defaultState();
-      state.feathers += feathersGain;
-      save();
-      return true;
-    }
-
-    // UI Wiring
-    const eggsEl = el('eggs');
-    const ducksEl = el('ducks');
-    const epsEl = el('eps');
-    const feathersEl = el('feathers');
-    const dexEl = el('dex');
-
-    function renderStats(){
-      eggsEl.textContent = fmt(state.eggs);
-      ducksEl.textContent = fmt(totalDucks());
-      epsEl.textContent = fmt(currentEPS());
-      feathersEl.textContent = fmt(state.feathers);
-      el('hatchCost').textContent = fmt(hatchCost());
-      el('evolveCost').textContent = fmt(evolveCost());
-      el('feederCost').textContent = fmt(feederCost());
-    }
-
-    function renderDex(){
-      dexEl.innerHTML = '';
-      SPECIES.forEach(s=>{
-        const count = state.speciesCounts[s.id];
-        const div = document.createElement('div');
-        div.className = 'duck';
-        div.innerHTML = `
-          <div class="name">${s.emoji} ${s.name}</div>
-          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px">
-            <span class="rarity r-${s.rarity}">${s.rarity}</span>
-            <span>Count: <b>${fmt(count)}</b></span>
-          </div>
-          <div style="margin-top:6px;opacity:.85">EPS each: ${s.eps}</div>
-        `;
-        dexEl.appendChild(div);
+    // Achievements
+    function checkAchievements(){
+      achievementsList.forEach(a=>{
+        if(!state.achievements.includes(a.id) && a.condition(state)){
+          state.achievements.push(a.id);
+          flash('Achievement Unlocked: '+a.text,'good');
+        }
       });
     }
 
-    // Actions
-    el('layBtn').addEventListener('click', ()=>{ state.eggs += 1; renderStats(); });
-
-    el('hatchBtn').addEventListener('click', ()=>{
-      const id = hatchDuck();
-      if(!id) return;
-      flash(`Hatched a ${SPECIES.find(s=>s.id===id).name}!`);
-      renderStats();
-      renderDex();
-    });
-
-    el('evolveBtn').addEventListener('click', ()=>{
-      const res = evolveDuck();
-      if(!res.ok){ flash(res.reason,'warn'); return; }
-      const s = SPECIES.find(x=>x.id===res.id);
-      flash(`Mutation success ➜ ${s.name} (${s.rarity})`);
-      renderStats();
-      renderDex();
-    });
-
-    el('feederBtn').addEventListener('click', ()=>{
-      const cost = feederCost();
-      if(state.eggs < cost){ flash('Not enough eggs','warn'); return; }
-      state.eggs -= cost;
-      state.feeders++;
-      flash('Bought a Feeder (+0.5 EPS)');
-      renderStats();
-    });
-
-    el('prestigeBtn').addEventListener('click', ()=>{
-      if(!prestigeAvailable()) { flash('Need at least 100 total ducks to prestige','warn'); return; }
-      if(doPrestige()){
-        flash('Prestiged! Golden Feathers boost your EPS by +10% each.','good');
-        renderStats();
-        renderDex();
+    // Perks
+    function buyPerk(id){
+      const perk = perksList.find(p=>p.id===id);
+      if(!perk) return;
+      if(state.feathers>=perk.cost && !state.perks.includes(id)){
+        state.feathers-=perk.cost;
+        state.perks.push(id);
+        perk.effect(state);
+        flash('Bought perk: '+perk.name,'good');
+        renderPerks();
       }
-    });
-
-    el('saveBtn').addEventListener('click', ()=>{ save(); flash('Saved!','good'); });
-    el('resetBtn').addEventListener('click', ()=>{
-      if(confirm('Hard reset? This clears your progress.')){
-        state = defaultState();
-        save();
-        renderStats();
-        renderDex();
-        flash('Progress wiped.','bad');
-      }
-    });
-
-    // Toasts
-    const toastQ = [];
-    function flash(msg,type='info'){
-      const n = document.createElement('div');
-      n.textContent = msg;
-      n.style.position='fixed';n.style.left='50%';n.style.transform='translateX(-50%)';
-      n.style.bottom = (20 + toastQ.length*44)+'px';
-      n.style.background = type==='good'? 'rgba(127,255,159,.18)': type==='warn'? 'rgba(255,210,124,.18)': type==='bad'? 'rgba(255,138,138,.2)': 'rgba(124,197,255,.18)';
-      n.style.border='1px solid rgba(255,255,255,.18)';
-      n.style.color='var(--text)';n.style.padding='10px 14px';n.style.borderRadius='999px';n.style.backdropFilter='blur(6px)';
-      n.style.zIndex=9999; n.style.fontWeight=700; n.style.boxShadow='0 10px 30px rgba(0,0,0,.35)';
-      document.body.appendChild(n); toastQ.push(n);
-      setTimeout(()=>{ n.style.transition='all .25s'; n.style.opacity='0'; n.style.transform='translateX(-50%) translateY(10px)'; }, 1600);
-      setTimeout(()=>{ document.body.removeChild(n); toastQ.shift(); }, 1900);
     }
 
-    // Game Loop
-    function tick(){
-      const now = Date.now();
-      const dt = Math.min(1, (now - state.lastTick)/1000); // cap to 1s to avoid massive jumps
-      state.lastTick = now;
-      // Passive egg gain
-      state.eggs += currentEPS()*dt;
+    // Offline Progress
+    (function offline(){
+      const now=Date.now();
+      const diff=Math.floor((now-state.lastTick)/1000);
+      if(diff>5){
+        state.eggs+=currentEPS()*diff;
+        flash('While you were away, your ducks produced '+fmt(currentEPS()*diff)+' eggs!','good');
+      }
+    })();
+
+    // Wild Duck random event
+    setInterval(()=>{
+      if(Math.random()<0.01){
+        const wild=el('wildDuck');
+        wild.style.display='block';
+        setTimeout(()=>wild.style.display='none',3000);
+      }
+    },5000);
+    el('wildDuck').addEventListener('click',()=>{
+      state.eggs+=50;
+      flash('You caught a Wild Duck! +50 eggs','good');
+      el('wildDuck').style.display='none';
       renderStats();
-      requestAnimationFrame(tick);
+    });
+
+    // Extend functions
+    const oldHatchCost = hatchCost;
+    hatchCost = ()=> state.hatchDiscount ? 5 : oldHatchCost();
+    const oldLay = ()=>{state.eggs+=1;};
+    el('layBtn').onclick = ()=>{state.eggs+=state.clickPower;renderStats();};
+
+    const oldRenderStats = renderStats;
+    renderStats = ()=>{oldRenderStats();el('habitat').textContent=habitats[state.habitat];el('habitatCost').textContent=fmt(habitatCost());};
+
+    function renderAchievements(){
+      const box = el('achievements');
+      box.innerHTML = achievementsList.map(a=>`<div>${state.achievements.includes(a.id)?'🏆':''} ${a.text}</div>`).join('');
+    }
+    function renderPerks(){
+      const box = el('perks');
+      box.innerHTML = perksList.map(p=>`<div>${p.name} (Cost: ${p.cost}) ${state.perks.includes(p.id)?'✅':`<button onclick=\"buyPerk('${p.id}')\">Buy</button>`}</div>`).join('');
     }
 
-    // Autosave
-    setInterval(save, 10000);
+    // Hook actions
+    el('habitatBtn').addEventListener('click', upgradeHabitat);
+    const oldHatch = hatchDuck;
+    hatchDuck = ()=>{const id=oldHatch();if(id)checkAchievements();return id;};
+    const oldEvolve = evolveDuck;
+    evolveDuck = (...args)=>{const res=oldEvolve(...args);checkAchievements();return res;};
 
-    // Initial render
-    renderStats();
-    renderDex();
-    state.lastTick = Date.now();
-    tick();
+    // Extend prestige
+    const oldPrestige = doPrestige;
+    doPrestige = ()=>{const perks=state.perks;const worked=oldPrestige();state.perks=perks;perks.forEach(p=>perksList.find(x=>x.id===p).effect(state));renderPerks();return worked;};
+
+    // Extend renderDex
+    const oldRenderDex = renderDex;
+    renderDex = ()=>{oldRenderDex();SPECIES.forEach(s=>{const div=[...dex.querySelectorAll('.duck')].find(d=>d.querySelector('.name').textContent.includes(s.name));if(div){div.innerHTML+=`<div style=\"margin-top:6px;opacity:.7;font-size:12px\">${s.desc}</div>`;}});};
+
+    // Initial render updates
+    renderAchievements();
+    renderPerks();
   </script>
 </body>
 </html>
+
