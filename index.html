@@ -297,7 +297,7 @@
     }
 
     // Actions
-    el('layBtn').addEventListener('click', ()=>{ state.eggs += 1; renderStats(); });
+    el('layBtn').addEventListener('click', ()=>{ state.eggs += 1; renderStats(); checkSpecialEvents();});
 
     el('hatchBtn').addEventListener('click', ()=>{
       const id = hatchDuck();
@@ -409,7 +409,33 @@ function renderAchievements() {
   });
 }
 
+function checkSpecialEvents() {
+  const roll = Math.random();
 
+  // Golden Egg
+  if (roll < SPECIAL_EVENTS.goldenEgg.chance) {
+    state.eggs += SPECIAL_EVENTS.goldenEgg.reward;
+    flash(`✨ Golden Egg! You gained ${SPECIAL_EVENTS.goldenEgg.reward} eggs!`, 'good');
+  }
+
+  // Mystery Duck
+  const rollDuck = Math.random();
+  if (rollDuck < SPECIAL_EVENTS.mysteryDuck.chance) {
+    // Pick random Rare or Legendary
+    const pool = SPECIES.filter(s => s.rarity === 'Rare' || s.rarity === 'Legendary');
+    const id = pool[Math.floor(Math.random() * pool.length)].id;
+    state.speciesCounts[id]++;
+    flash(`🎁 Mystery Duck appeared: ${SPECIES.find(s => s.id === id).name}!`, 'good');
+    renderDex();
+  }
+}
+// Special Events
+const SPECIAL_EVENTS = {
+  goldenEgg: { chance: 0.01, reward: 50 }, // 1% chance, +50 eggs
+  mysteryDuck: { chance: 0.005 }           // 0.5% chance, spawns a random rare/legendary duck
+};
+
+    
 // Hook into your game loop
 const oldTick = tick;
 function tickWrapper() {
@@ -441,5 +467,6 @@ tick = tickWrapper;
   </script>
 </body>
 </html>
+
 
 
